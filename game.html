@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Apple Catch Game</title>
+    <script src="https://aframe.io/releases/0.9.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-physics-system@4.0.0/dist/aframe-physics-system.min.js"></script>
+
+    <script>
+        AFRAME.registerComponent('apple-spawner', {
+            init: function () {
+                this.score = 0;
+                this.timeLeft = 30;
+                this.gameOver = false;
+                this.scoreTextEl = document.querySelector('#scoreText');
+                this.timerTextEl = document.querySelector('#timerText');
+                this.backgroundMusic = document.querySelector('#backgroundMusic');
+                this.collectSound = document.querySelector('#collectSound');
+                this.gameOverSound = document.querySelector('#gameOverSound');
+
+                this.onAppleCollected = this.onAppleCollected.bind(this);
+                this.el.addEventListener('apple-collected', this.onAppleCollected);
+
+                this.startGame();
+            },
+
+            startGame: function () {
+                this.backgroundMusic.components.sound.playSound();
+                this.scheduleNextSpawn();
+
+                // Обновляем таймер каждую секунду
+                this.timerInterval = setInterval(() => {
+                    if (this.gameOver) return;
+                    this.timeLeft--;
+                    this.timerTextEl.setAttribute('text', 'value', 'Time: ' + this.timeLeft);
+                    if (this.timeLeft <= 0) {
+                        this.endGame();
+                    }
+                }, 1000);
+            },
+
+            scheduleNextSpawn: function () {
+                if (this.gameOver) return;
+                setTimeout(() => {
+                    this.spawnApple();
+                }, 2000);
+            },
+
+            spawnApple: function () {
+                if (this.gameOver) return;
+
+                const appleEl = document.createElement('a-entity');
+                appleEl.classList.add('apple', 'clickable');
+                appleEl.setAttribute('gltf-model', '#appleModel');
+                appleEl.setAttribute('scale', '0.5 0.5 0.5');
+                appleEl.setAttribute('position', `${this.random(-5, 5)} ${this.random(6, 10)} ${this.random(-5, 5)}`);
+                appleEl.setAttribute('dynamic-body', 'shape: auto; mass: 1');
+                
+                // Анимация "bounce" при клике
+                appleEl.setAttribute('animation__bounce', {
+                    property: 'scale',
+                    to: '0.7 0.7 0.7',
+                    dur: 200,
+                    easing: 'easeOutQuad',
+                    dir: 'alternate'
+                });
+                
+                appleEl.addEventListener('click', () => {
+                    this.el.removeChild(appleEl);
+                    this.el.emit('apple-collected');
+                    this.collectSound.components.sound.playSound();
+                });
+
+                this.el.appendChild(appleEl);
+                this.scheduleNextSpawn();
+            },
+
+            onAppleCollected: function () {
+                if (this.gameOver) return;
+                this.score++;
+                this.scoreTextEl.setAttribute('text', 'value', 'Score: ' + this.score);
+            },
+
+            endGame: function () {
+                this.gameOver = true;
+                clearInterval(this.timerInterval);
+                this.backgroundMusic.components.sound.stopSound();
+                this.gameOverSound.components.sound.playSound();
+
+                setTimeout(() => {
+                    alert(`Game Over! You collected ${this.score} apples.`);
+                }, 2000);
+            },
+
+            random: function (min, max) {
+                return Math.random() * (max - min) + min;
+            }
+        });
+    </script>
+
+    <style>
+        body { margin: 0; padding: 0; }
+        html, body, #gameScene { width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+<a-scene id="gameScene" physics="debug: false" apple-spawner>
+    <a-assets>
+        <a-asset-item id="appleModel" src="models/apple.glb"></a-asset-item>
+        <img id="groundTexture" src="images/ground.jpg">
+        <img id="logoImage" src="images/logo.png">
+        <audio id="bgMusic" src="audio/background.mp3" preload="auto"></audio>
+        <audio id="collect" src="audio/collect.mp3" preload="auto"></audio>
+        <audio id="gameOver" src="audio/gameover.mp3" preload="auto"></audio>
+    </a-assets>
+
+    <a-entity id="backgroundMusic" sound="src: #bgMusic; autoplay: true; loop: true"></a-entity>
+    <a-entity id="collectSound" sound="src: #collect"></a-entity>
+    <a-entity id="gameOverSound" sound="src: #gameOver"></a-entity>
+
+    <a-sky color="#87CEEB"></a-sky>
+
+    <a-plane rotation="-90 0 0" width="20" height="20" static-body material="src: #groundTexture; repeat: 4 4"></a-plane>
+
+    <a-entity light="type: directional; intensity: 0.8" position="5 10 5"></a-entity>
+    <a-entity light="type: ambient; intensity: 0.5"></a-entity>
+
+
+    <a-image src="#logoImage" position="0 3 -4" width="2" height="2"></a-image>
+
+    <a-entity camera position="0 1.6 0" look-controls>
+        <a-entity cursor="fuse: false; rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+        <a-entity id="scoreText" text="value: Score: 0; color: #FFF; width: 3" position="0.5 -0.5 -1"></a-entity>
+        <a-entity id="timerText" text="value: Time: 30; color: #FFF; width: 3" position="1 -0.5 -1"></a-entity>
+    </a-entity>
+</a-scene>
+</body>
+</html>
+
