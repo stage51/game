@@ -5,30 +5,95 @@
     <title>Apple Catch AR Game</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/aframe-physics-system@4.0.0/dist/aframe-physics-system.min.js"></script>
-
+    
     <script>
         AFRAME.registerComponent('apple-spawner', {
             init: function () {
-                this.spawnApples();
+                this.score = 0;
+                this.timeLeft = 30;
+                this.gameOver = false;
+                this.scoreTextEl = document.querySelector('#scoreText');
+                this.timerTextEl = document.querySelector('#timerText');
+
+                this.onAppleCollected = this.onAppleCollected.bind(this);
+                this.el.addEventListener('apple-collected', this.onAppleCollected);
+
+                this.startGame();
             },
 
-            spawnApples: function () {
-                for (let i = 0; i < 5; i++) {
+            startGame: function () {
+                console.log("Игра началась!");
+                this.scheduleNextSpawn();
+
+                this.timerInterval = setInterval(() => {
+                    if (this.gameOver) return;
+                    this.timeLeft--;
+                    this.timerTextEl.setAttribute('text', 'value', 'Time: ' + this.timeLeft);
+                    if (this.timeLeft <= 0) {
+                        this.endGame();
+                    }
+                }, 1000);
+            },
+
+            scheduleNextSpawn: function () {
+                if (this.gameOver) return;
+                setTimeout(() => {
+                    this.spawnApple();
+                }, 2000);
+            },
+
+            spawnApple: function () {
+                if (this.gameOver) return;
+
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const lat = position.coords.latitude + this.randomOffset();
+                    const lon = position.coords.longitude + this.randomOffset();
+
+                    console.log(`Создаю яблоко: lat=${lat}, lon=${lon}`);
+
                     const appleEl = document.createElement('a-entity');
                     appleEl.setAttribute('gltf-model', '#appleModel');
                     appleEl.setAttribute('scale', '0.5 0.5 0.5');
-                    appleEl.setAttribute('position', `${this.random(-2, 2)} ${this.random(1, 3)} ${this.random(-2, 2)}`);
-                    this.el.sceneEl.appendChild(appleEl);
-                }
+                    appleEl.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon}`);
+                    appleEl.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 4000');
+
+                    appleEl.addEventListener('click', () => {
+                        console.log("Яблоко собрано!");
+                        this.el.removeChild(appleEl);
+                        this.el.emit('apple-collected');
+                    });
+
+                    document.querySelector('a-scene').appendChild(appleEl);
+                    this.scheduleNextSpawn();
+                }, (error) => {
+                    console.error("Ошибка получения геолокации: ", error);
+                });
             },
 
-            random: function (min, max) {
-                return Math.random() * (max - min) + min;
+            onAppleCollected: function () {
+                if (this.gameOver) return;
+                this.score++;
+                this.scoreTextEl.setAttribute('text', 'value', 'Score: ' + this.score);
+            },
+
+            endGame: function () {
+                this.gameOver = true;
+                clearInterval(this.timerInterval);
+                setTimeout(() => {
+                    alert(`Игра окончена! Вы собрали ${this.score} яблок.`);
+                }, 2000);
+            },
+
+            randomOffset: function () {
+                return (Math.random() - 0.5) * 0.0002;
             }
         });
     </script>
 
+    <style>
+        body { margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100%; overflow: hidden; }
+    </style>
 </head>
 <body>
     <a-scene embedded arjs>
@@ -37,7 +102,10 @@
         </a-assets>
 
         <a-camera gps-camera rotation-reader></a-camera>
-        
+
+        <a-entity id="scoreText" text="value: Score: 0; color: white; width: 3" position="0 2 -3"></a-entity>
+        <a-entity id="timerText" text="value: Time: 30; color: white; width: 3" position="0 1.5 -3"></a-entity>
+
         <a-entity apple-spawner></a-entity>
     </a-scene>
 </body>
